@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { CompanySearch } from './components/CompanySearch'
 import { SectionView } from './components/SectionView'
+import { loadCompany } from './lib/data'
+import { toFiling, type CompanyRecord } from './lib/dataset'
 import type { Company, Filing } from './lib/edgar'
 import { findItem1, type Section } from './lib/extract'
 import { edgar } from './lib/sec'
@@ -12,7 +14,13 @@ type Load<T> =
   | { state: 'error'; message: string }
   | { state: 'done'; value: T }
 
-type FilingList = { name: string; filings: Filing[]; hasOlder: boolean }
+type FilingList = {
+  name: string
+  filings: Filing[]
+  hasOlder: boolean
+  /** False while only the dataset's latest 10-K is listed (EDGAR not asked yet). */
+  live: boolean
+}
 
 function readCikFromUrl(): number | null {
   const cik = Number(new URLSearchParams(location.search).get('cik'))
@@ -23,6 +31,7 @@ export default function App() {
   const [cik, setCik] = useState<number | null>(readCikFromUrl)
   const [list, setList] = useState<Load<FilingList>>({ state: 'idle' })
   const [filing, setFiling] = useState<Filing | null>(null)
+  const [record, setRecord] = useState<CompanyRecord | null>(null)
   const [section, setSection] = useState<Load<Section | null>>({ state: 'idle' })
 
   useEffect(() => {
@@ -31,24 +40,35 @@ export default function App() {
     return () => removeEventListener('popstate', onPop)
   }, [])
 
-  // Company -> its 10-K filings.
+  // Company -> its 10-K filings: the dataset's latest one if it has the
+  // company, otherwise the full list from EDGAR.
   useEffect(() => {
     if (cik === null) {
       setList({ state: 'idle' })
       setFiling(null)
+      setRecord(null)
       return
     }
     let cancelled = false
     setList({ state: 'loading', message: 'Finding 10-K filings…' })
     setFiling(null)
-    edgar.listTenKs(cik).then(
-      (value) => {
-        if (cancelled) return
-        setList({ state: 'done', value })
-        setFiling(value.filings[0])
-      },
-      (e: Error) => !cancelled && setList({ state: 'error', message: e.message }),
-    )
+    loadCompany(cik)
+      .then(async (rec): Promise<[FilingList, CompanyRecord | null]> => {
+        if (rec) {
+          const filings = [toFiling(rec.filing, '/sec-www')]
+          return [{ name: rec.name, filings, hasOlder: true, live: false }, rec]
+        }
+        return [{ ...(await edgar.listTenKs(cik)), live: true }, null]
+      })
+      .then(
+        ([value, rec]) => {
+          if (cancelled) return
+          setRecord(rec)
+          setList({ state: 'done', value })
+          setFiling(value.filings[0])
+        },
+        (e: Error) => !cancelled && setList({ state: 'error', message: e.message }),
+      )
     return () => {
       cancelled = true
     }
@@ -58,6 +78,10 @@ export default function App() {
   useEffect(() => {
     if (!filing) {
       setSection({ state: 'idle' })
+      return
+    }
+    if (record?.filing.accession === filing.accession) {
+      setSection({ state: 'done', value: record.section })
       return
     }
     let cancelled = false
@@ -75,7 +99,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [filing])
+  }, [filing, record])
 
   function chooseCompany(company: Company) {
     history.pushState(null, '', `?cik=${company.cik}`)
@@ -85,9 +109,11 @@ export default function App() {
   async function loadOlder() {
     if (list.state !== 'done' || cik === null) return
     const current = list.value
-    setList({ state: 'loading', message: 'Reading older filing history…' })
+    setList({ state: 'loading', message: 'Reading filing history from EDGAR…' })
     try {
-      setList({ state: 'done', value: await edgar.listTenKs(cik, { all: true }) })
+      // First click lists recent years; after that, the full history.
+      const value = { ...(await edgar.listTenKs(cik, { all: current.live })), live: true }
+      setList({ state: 'done', value })
     } catch (e) {
       setList({ state: 'done', value: current })
       alert((e as Error).message)
@@ -169,7 +195,7 @@ function FilingHeader(props: {
         </label>
         {list.hasOlder && (
           <button type="button" className="link-button" onClick={props.onLoadOlder}>
-            Find older 10-Ks
+            {list.live ? 'Find older 10-Ks' : 'Other years'}
           </button>
         )}
         <a href={filing.publicUrl} target="_blank" rel="noreferrer">

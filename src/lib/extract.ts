@@ -192,19 +192,26 @@ function titleSize(b: RawBlock): string | null {
   return null
 }
 
+const isRunIn = (b: RawBlock) => headingText(b) !== b.text
+
 /**
  * The fallback section ends at Risk Factors / MD&A / an Item heading, or at
- * the next title in the same font size as its own (the next top-level topic).
+ * the next title like its own: same font size, and standalone or run-in alike
+ * (Diebold's standalone "BUSINESS" has run-in subtopics in the same size).
  */
 function fallbackEnd(blocks: RawBlock[], start: number): number {
   const size = titleSize(blocks[start])
+  const runIn = isRunIn(blocks[start])
   for (let j = start + 1; j < blocks.length; j++) {
     const b = blocks[j]
     if (b.isTable && b.text.includes('\n')) continue
     const text = headingText(b)
     if (text.length > 120) continue
-    if (FALLBACK_END_RE.test(text) || isEnd(b, ANY_ITEM_RE)) return j
-    if (size && titleSize(b) === size) return j
+    // A run-in "Properties." inside the section is a subtopic, not the end,
+    // unless it's titled like the section itself.
+    const topLevel = !isRunIn(b) || (size !== null && titleSize(b) === size)
+    if ((FALLBACK_END_RE.test(text) && topLevel) || isEnd(b, ANY_ITEM_RE)) return j
+    if (size && titleSize(b) === size && isRunIn(b) === runIn) return j
   }
   return blocks.length
 }

@@ -23,6 +23,8 @@ export type EdgarConfig = {
   /** Base for https://efts.sec.gov (EDGAR's own company-name autocomplete). */
   efts: string
   init?: RequestInit
+  /** Replaces the global fetch, e.g. to rate-limit a batch job. */
+  fetch?: typeof fetch
 }
 
 type FilingColumns = {
@@ -36,6 +38,8 @@ type FilingColumns = {
 type Submissions = {
   name: string
   tickers: string[]
+  sic: string
+  sicDescription: string
   filings: { recent: FilingColumns; files: { name: string }[] }
 }
 
@@ -44,7 +48,7 @@ const FOREIGN_FORMS = new Set(['20-F', '40-F'])
 
 export function createEdgar(config: EdgarConfig) {
   async function get(url: string): Promise<Response> {
-    const res = await fetch(url, config.init)
+    const res = await (config.fetch ?? fetch)(url, config.init)
     if (!res.ok) throw new Error(`EDGAR returned ${res.status} for ${url}`)
     return res
   }
@@ -141,7 +145,10 @@ export function createEdgar(config: EdgarConfig) {
    * 10-K out of it. Older pages are read until one turns up, or all of them
    * with `all`.
    */
-  async function listTenKs(cik: number, { all = false } = {}): Promise<{ name: string; filings: Filing[]; hasOlder: boolean }> {
+  async function listTenKs(
+    cik: number,
+    { all = false } = {},
+  ): Promise<{ name: string; tickers: string[]; sic: string; industry: string; filings: Filing[]; hasOlder: boolean }> {
     const cik10 = String(cik).padStart(10, '0')
     const subs: Submissions = await (await get(`${config.data}/submissions/CIK${cik10}.json`)).json()
     const filings = toFilings(cik, subs.filings.recent, TEN_K_FORMS)
@@ -160,7 +167,14 @@ export function createEdgar(config: EdgarConfig) {
           : `No 10-K filings found for ${subs.name}. If it recently reorganized under a new holding company, search for the earlier company by name.`,
       )
     }
-    return { name: subs.name, filings, hasOlder: pagesRead < subs.filings.files.length }
+    return {
+      name: subs.name,
+      tickers: subs.tickers,
+      sic: subs.sic,
+      industry: subs.sicDescription,
+      filings,
+      hasOlder: pagesRead < subs.filings.files.length,
+    }
   }
 
   async function fetchDocument(filing: Filing): Promise<string> {

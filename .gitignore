@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .cache
+
+# Precomputed dataset (lives on the data branch)
+data/
+.dev.vars
+.wrangler/

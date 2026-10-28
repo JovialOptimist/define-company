@@ -1,6 +1,21 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { searchDataset } from '../lib/data'
 import type { Company } from '../lib/edgar'
 import { edgar } from '../lib/sec'
+
+const LIMIT = 8
+
+/**
+ * The dataset first (no EDGAR traffic); live EDGAR search only fills in when
+ * it has few matches, e.g. companies that haven't filed a 10-K this year.
+ */
+async function search(query: string): Promise<Company[]> {
+  const local = await searchDataset(query, LIMIT)
+  if (local.length >= 3) return local
+  const live = await edgar.searchCompanies(query, LIMIT).catch(() => [])
+  const seen = new Set(local.map((c) => c.cik))
+  return [...local, ...live.filter((c) => !seen.has(c.cik))].slice(0, LIMIT)
+}
 
 /** Ticker / name / CIK search box with a keyboard-navigable suggestion list. */
 export function CompanySearch({ onSelect }: { onSelect: (c: Company) => void }) {
@@ -20,7 +35,7 @@ export function CompanySearch({ onSelect }: { onSelect: (c: Company) => void }) 
     }
     const id = ++latest.current
     const timer = setTimeout(() => {
-      edgar.searchCompanies(q).then(
+      search(q).then(
         (r) => {
           if (id !== latest.current) return
           setResults(r)
