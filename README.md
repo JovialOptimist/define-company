@@ -36,6 +36,14 @@ dev/preview server proxies all EDGAR calls (`/sec-www`, `/sec-data`, `/sec-efts`
   cross-reference index instead of Item headings (GE, Honeywell, Intel) fall back to the first
   "About …" / "Our Business" / "Business overview" section, and the page says so.
 
+## Glossary
+
+`src/data/glossary.json` holds 200 business terms with plain-English definitions. In the
+displayed section, the first use of each term per subsection gets a dashed underline; clicking it
+(or Enter/Space) opens the definition. The terms were chosen by counting how many of ~60 real 10-K
+Item 1 sections use each candidate term, after dropping everyday words too vague to define well
+("platform", "property"). The definitions were written for this project, not copied from a source.
+
 ## Testing the extractor
 
 ```

@@ -123,7 +123,7 @@ export default function App() {
         {section.state === 'error' && <ErrorBox>{section.message}</ErrorBox>}
         {section.state === 'done' && filing &&
           (section.value ? (
-            <SectionView section={section.value} />
+            <SectionView key={filing.accession} section={section.value} />
           ) : (
             <ErrorBox>
               Couldn't find the Item 1 (Business) section in this filing. Some 10-Ks use a

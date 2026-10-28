@@ -144,4 +144,50 @@ main { margin-top: 2rem; }
 .section-body td { padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .section-body tr:first-child td { font-weight: 600; }
 
+/* ---- glossary terms ---- */
+.term, .term-sample {
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--muted);
+}
+.term { cursor: help; border-radius: 2px; }
+.term:hover { text-decoration-color: var(--text); }
+.term:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Open term: solid underline and a background, not just a color change. */
+.term-open { text-decoration-style: solid; text-decoration-color: var(--text); background: var(--accent-soft); }
+.term-hint { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.9em; }
+
+.term-popover {
+  position: absolute;
+  z-index: 20;
+  width: min(22rem, calc(100vw - 32px));
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.term-popover-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.term-popover h4 { margin: 0 0 0.35rem; font-size: 1rem; }
+.term-alias { color: var(--muted); font-weight: 400; }
+.term-popover p { margin: 0; }
+.term-popover .term-source { margin-top: 0.5rem; color: var(--muted); font-size: 0.8rem; }
+.term-close {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: -0.3rem -0.5rem 0 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.term-close:hover { background: var(--accent-soft); }
+
 .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
