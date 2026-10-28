@@ -1,0 +1,41 @@
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --text: #1d1c1a;
+  --muted: #5f5b55;
+  --border: #dedad3;
+  --accent: #1f4fa3;
+  --accent-soft: #e8eefa;
+  --note-bg: #fff6dc;
+  --note-border: #b8902b;
+  --error-bg: #fde8e6;
+  --error-border: #b3261e;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, serif;
+
+  color-scheme: light dark;
+  font: 16px/1.55 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161514;
+    --surface: #1f1e1c;
+    --text: #ebe8e3;
+    --muted: #a8a39b;
+    --border: #3a3835;
+    --accent: #8fb3ff;
+    --accent-soft: #24304a;
+    --note-bg: #332b14;
+    --note-border: #d9b54f;
+    --error-bg: #3b1c1a;
+    --error-border: #f2948c;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
