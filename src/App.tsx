@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { CompanySearch } from './components/CompanySearch'
+import { Masthead } from './components/Masthead'
 import { SectionView } from './components/SectionView'
 import { datasetSize, latestFilings, loadCompany } from './lib/data'
 import { toFiling, type CompanyRecord } from './lib/dataset'
@@ -134,9 +135,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Masthead onHome={() => goTo(null)}>
-        {cik !== null && <CompanySearch compact onSelect={(c) => goTo(c.cik)} />}
-      </Masthead>
+      <Masthead onHome={() => goTo(null)} onSelect={(c) => goTo(c.cik)} />
 
       <main>
         {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} />}
@@ -183,26 +182,6 @@ export default function App() {
         </p>
       </footer>
     </div>
-  )
-}
-
-const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-
-function Masthead({ onHome, children }: { onHome: () => void; children?: React.ReactNode }) {
-  return (
-    <header className="masthead">
-      <div className="masthead-bar">
-        <span className="masthead-side">Annual reports, explained</span>
-        <h1 className="wordmark">
-          <a href="./" onClick={(e) => { e.preventDefault(); onHome() }}>
-            Define Company
-          </a>
-        </h1>
-        <span className="masthead-side masthead-date">{TODAY}</span>
-      </div>
-      <div className="masthead-rule" aria-hidden="true" />
-      {children && <div className="masthead-search">{children}</div>}
-    </header>
   )
 }
 

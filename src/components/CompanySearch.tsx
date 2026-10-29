@@ -18,7 +18,13 @@ async function search(query: string): Promise<Company[]> {
 }
 
 /** Ticker / name / CIK search box with a keyboard-navigable suggestion list. */
-export function CompanySearch({ onSelect, compact }: { onSelect: (c: Company) => void; compact?: boolean }) {
+export function CompanySearch(props: {
+  onSelect: (c: Company) => void
+  /** The masthead's small version, which opens focused and can be dismissed. */
+  compact?: boolean
+  onCancel?: () => void
+}) {
+  const { onSelect, compact, onCancel } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Company[]>([])
   const [active, setActive] = useState(0)
@@ -64,7 +70,9 @@ export function CompanySearch({ onSelect, compact }: { onSelect: (c: Company) =>
       e.preventDefault()
       setActive((a) => Math.max(a - 1, 0))
     } else if (e.key === 'Escape') {
-      setOpen(false)
+      // First Escape closes the suggestions, the next one the search itself.
+      if (open && results.length) setOpen(false)
+      else onCancel?.()
     }
   }
 
@@ -100,6 +108,7 @@ export function CompanySearch({ onSelect, compact }: { onSelect: (c: Company) =>
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={onKeyDown}
+        autoFocus={compact}
       />
       <button type="submit" disabled={!results.length}>
         Look up

@@ -20,13 +20,36 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.masthead-date { text-align: right; }
+/* Search and theme buttons. Each has a text label (an aria-label when the
+   label is hidden on phones), so it doesn't rely on the icon alone. */
+.masthead-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; min-width: 0; }
+.masthead-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+  padding: 0 0.6rem;
+  border: 1px solid transparent;
+  background: none;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.masthead-button:hover { border-color: var(--ink); }
+.masthead-close { font-size: 1.4rem; font-weight: 400; letter-spacing: 0; }
+.masthead-search { display: flex; flex: 1; align-items: center; gap: 0.15rem; min-width: 0; max-width: 24rem; }
+.masthead-search .search { flex: 1; min-width: 0; }
+.masthead-search .suggestions { left: auto; width: min(28rem, calc(100vw - 2rem)); }
 .wordmark { margin: 0; font-family: var(--display); font-size: 2.1rem; font-weight: 900; line-height: 1.1; }
 .wordmark a { color: inherit; text-decoration: none; }
 /* The double rule under a newspaper's nameplate. */
 .masthead-rule { height: 4px; border-bottom: 1px solid var(--ink); }
-.masthead-search { display: flex; justify-content: flex-end; margin-top: 0.9rem; }
-.masthead-search .search { width: min(24rem, 100%); }
 
 /* ---- shared editorial type ---- */
 .kicker {
@@ -369,13 +392,20 @@ main { margin-top: 2.25rem; }
 }
 @media (max-width: 40rem) {
   .app { padding: 1rem 1rem 2.5rem; }
-  .masthead-bar { grid-template-columns: 1fr; text-align: center; }
-  .masthead-side { display: none; }
-  .wordmark { font-size: 1.8rem; }
-  .masthead-search .search { width: 100%; }
+  .masthead-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.5rem; }
+  .masthead-side, .masthead-button-label { display: none; }
+  .wordmark { font-size: 1.6rem; }
+  /* An open search takes its own full-width row under the wordmark. */
+  .masthead-searching .masthead-actions { flex-basis: 100%; }
+  .masthead-search { max-width: none; }
   /* Stacked meta lines: no leading separators where a row wraps. */
   .filing-meta { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
   .filing-meta > * + *::before { content: none; }
   .pull-quote { float: none; width: auto; margin: 1.25rem 0; }
   .section-body { font-size: 1.05rem; }
 }
+
+/* In the masthead, Enter or a suggestion submits; the button and the
+   browser's own clear "×" would only crowd the field next to our close. */
+.search-compact button[type='submit'] { display: none; }
+.search-compact input::-webkit-search-cancel-button { display: none; }

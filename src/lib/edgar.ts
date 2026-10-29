@@ -45,6 +45,28 @@ type Submissions = {
 
 const TEN_K_FORMS = new Set(['10-K', '10-KT', '10-K405'])
 const FOREIGN_FORMS = new Set(['20-F', '40-F'])
+/** Filed by people and funds about stakes they hold, not about a business of their own. */
+const OWNERSHIP_FORMS = new Set(['3', '4', '5', 'SC 13D', 'SC 13G', 'SCHEDULE 13D', 'SCHEDULE 13G', '13F-HR', '13F-NT', '144'])
+/** Notices of private fundraising (Regulation D), which need no annual report. */
+const PRIVATE_OFFERING_FORMS = new Set(['D', 'REGDEX'])
+
+/** Explains, from what a filer does file, why it has no 10-K. */
+function whyNoTenK(subs: Submissions): string {
+  const forms = subs.filings.recent.form.map((f) => f.replace(/\/A$/, ''))
+  const only = (set: Set<string>) => forms.length > 0 && forms.every((f) => set.has(f))
+  const foreign = forms.find((f) => FOREIGN_FORMS.has(f))
+  if (foreign) return `${subs.name} files a ${foreign} (foreign private issuer) instead of a 10-K.`
+  if (only(OWNERSHIP_FORMS)) {
+    return `${subs.name} only files ownership and insider-trading reports (such as Forms 3, 4 and 13D), so it's probably a person or an investor, not a company with a 10-K.`
+  }
+  if (only(PRIVATE_OFFERING_FORMS)) {
+    return `${subs.name} has only filed notices of private fundraising (Form D), which don't come with a 10-K.`
+  }
+  if (forms.some((f) => f.startsWith('1-K') || f.startsWith('1-A'))) {
+    return `${subs.name} raises money under Regulation A and files a Form 1-K annual report, not a 10-K.`
+  }
+  return `No 10-K filings found for ${subs.name}. If it recently reorganized under a new holding company, search for the earlier company by name.`
+}
 
 export function createEdgar(config: EdgarConfig) {
   async function get(url: string): Promise<Response> {
@@ -75,16 +97,42 @@ export function createEdgar(config: EdgarConfig) {
    * are ignored.
    */
   async function searchEntities(query: string): Promise<Company[]> {
+    let found: Company[]
     try {
       const res = await get(`${config.efts}/LATEST/search-index?keysTyped=${encodeURIComponent(query)}`)
       const json: { hits: { hits: { _id: string; _source: { entity: string; tickers?: string } }[] } } = await res.json()
-      return json.hits.hits.map((h) => ({
+      found = json.hits.hits.map((h) => ({
         cik: Number(h._id),
         ticker: h._source.tickers?.split(',')[0]?.trim() ?? '',
-        name: h._source.entity,
+        // The autocomplete appends tickers to the name: "COCA COLA CO (KO)".
+        name: h._source.entity.replace(/\s*\([A-Z0-9.,\s-]+\)$/, ''),
       }))
     } catch {
       return []
+    }
+    // Without a ticker, most hits are people, investors or private offerings
+    // that never file a 10-K (Forms 3/4, 13D, Reg D). Keep only real filers.
+    const unlisted = found.filter((c) => !c.ticker).map((c) => c.cik)
+    const filers = unlisted.length ? await tenKFilers(unlisted) : null
+    return filers ? found.filter((c) => c.ticker || filers.has(c.cik)) : found
+  }
+
+  /**
+   * Which of these CIKs have ever filed a 10-K, from EDGAR full-text search
+   * (filings since 2001), in one request. null if the search fails, so
+   * callers can fall back to showing everything.
+   */
+  async function tenKFilers(ciks: number[]): Promise<Set<number> | null> {
+    try {
+      const list = ciks.map((c) => String(c).padStart(10, '0')).join(',')
+      const res = await get(`${config.efts}/LATEST/search-index?forms=${[...TEN_K_FORMS].join(',')}&ciks=${list}`)
+      const json: { aggregations: { entity_filter: { buckets: { key: string }[] } } } = await res.json()
+      // Bucket keys look like "TWITTER, INC.  (CIK 0001418091)".
+      return new Set(
+        json.aggregations.entity_filter.buckets.map((b) => Number(/\(CIK (\d+)\)$/.exec(b.key)?.[1])).filter(Boolean),
+      )
+    } catch {
+      return null
     }
   }
 
@@ -159,14 +207,7 @@ export function createEdgar(config: EdgarConfig) {
       filings.push(...toFilings(cik, cols, TEN_K_FORMS))
       pagesRead++
     }
-    if (!filings.length) {
-      const foreign = subs.filings.recent.form.find((f) => FOREIGN_FORMS.has(f))
-      throw new Error(
-        foreign
-          ? `${subs.name} files a ${foreign} (foreign private issuer) instead of a 10-K.`
-          : `No 10-K filings found for ${subs.name}. If it recently reorganized under a new holding company, search for the earlier company by name.`,
-      )
-    }
+    if (!filings.length) throw new Error(whyNoTenK(subs))
     return {
       name: subs.name,
       tickers: subs.tickers,
