@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { CompanySearch } from './components/CompanySearch'
+import { Masthead } from './components/Masthead'
 import { SectionView } from './components/SectionView'
 import { datasetSize, latestFilings, loadCompany } from './lib/data'
 import { toFiling, type CompanyRecord } from './lib/dataset'
@@ -36,6 +37,7 @@ export default function App() {
   const [filing, setFiling] = useState<Filing | null>(null)
   const [record, setRecord] = useState<CompanyRecord | null>(null)
   const [section, setSection] = useState<Load<Section | null>>({ state: 'idle' })
+  const homeSearch = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const onPop = () => setCik(readCikFromUrl())
@@ -134,12 +136,16 @@ export default function App() {
 
   return (
     <div className="app">
-      <Masthead onHome={() => goTo(null)}>
-        {cik !== null && <CompanySearch compact onSelect={(c) => goTo(c.cik)} />}
-      </Masthead>
+      <Masthead
+        onHome={() => goTo(null)}
+        onSelect={(c) => goTo(c.cik)}
+        // The front page has its own big search box: point the header's
+        // Search button at it rather than opening a second search.
+        pageSearch={cik === null ? homeSearch : undefined}
+      />
 
       <main>
-        {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} />}
+        {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} searchRef={homeSearch} />}
 
         {list.state === 'loading' && <Status>{list.message}</Status>}
         {list.state === 'error' && <ErrorBox>{list.message}</ErrorBox>}
@@ -186,26 +192,6 @@ export default function App() {
   )
 }
 
-const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-
-function Masthead({ onHome, children }: { onHome: () => void; children?: React.ReactNode }) {
-  return (
-    <header className="masthead">
-      <div className="masthead-bar">
-        <span className="masthead-side">Annual reports, explained</span>
-        <h1 className="wordmark">
-          <a href="./" onClick={(e) => { e.preventDefault(); onHome() }}>
-            Define Company
-          </a>
-        </h1>
-        <span className="masthead-side masthead-date">{TODAY}</span>
-      </div>
-      <div className="masthead-rule" aria-hidden="true" />
-      {children && <div className="masthead-search">{children}</div>}
-    </header>
-  )
-}
-
 function Kicker({ list }: { list: FilingList }) {
   const parts = [list.industry, list.tickers.join(' · ')].filter(Boolean)
   return parts.length ? <p className="kicker">{parts.join(' · ')}</p> : null
@@ -224,38 +210,42 @@ function FilingMeta(props: {
   onLoadOlder: () => void
 }) {
   const { list, filing, section } = props
+  const items = [
+    section && <span key="heading">{section.heading}</span>,
+    <span key="filed">
+      From the {filing.form} filed {formatDate(filing.filingDate)}
+      {filing.reportDate && <>, for the fiscal year ended {formatDate(filing.reportDate)}</>}
+    </span>,
+    section && <span key="read">{readMinutes(section)} min read</span>,
+    list.filings.length > 1 && (
+      <label key="filing">
+        <span className="visually-hidden">Filing</span>
+        <select
+          value={filing.accession}
+          onChange={(e) => props.onChange(list.filings.find((f) => f.accession === e.target.value)!)}
+        >
+          {list.filings.map((f, i) => (
+            <option key={f.accession} value={f.accession}>
+              {f.form}, year ended {f.reportDate ? formatDate(f.reportDate) : '?'}
+              {i === 0 ? ' (latest)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+    ),
+    list.hasOlder && (
+      <button key="older" type="button" className="link-button" onClick={props.onLoadOlder}>
+        {list.live ? 'Find older 10-Ks' : 'Other years'}
+      </button>
+    ),
+    <a key="sec" href={filing.publicUrl} target="_blank" rel="noreferrer">
+      Original on sec.gov ↗
+    </a>,
+  ].filter(Boolean)
   return (
     <div className="filing-meta">
-      {section && <span>{section.heading}</span>}
-      <span>
-        From the {filing.form} filed {formatDate(filing.filingDate)}
-        {filing.reportDate && <>, for the fiscal year ended {formatDate(filing.reportDate)}</>}
-      </span>
-      {section && <span>{readMinutes(section)} min read</span>}
-      {list.filings.length > 1 && (
-        <label>
-          <span className="visually-hidden">Filing</span>
-          <select
-            value={filing.accession}
-            onChange={(e) => props.onChange(list.filings.find((f) => f.accession === e.target.value)!)}
-          >
-            {list.filings.map((f, i) => (
-              <option key={f.accession} value={f.accession}>
-                {f.form}, year ended {f.reportDate ? formatDate(f.reportDate) : '?'}
-                {i === 0 ? ' (latest)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {list.hasOlder && (
-        <button type="button" className="link-button" onClick={props.onLoadOlder}>
-          {list.live ? 'Find older 10-Ks' : 'Other years'}
-        </button>
-      )}
-      <a href={filing.publicUrl} target="_blank" rel="noreferrer">
-        Original on sec.gov ↗
-      </a>
+      {/* Dots go between the items, not inside them, so links don't underline them. */}
+      {items.flatMap((item, i) => (i ? [<span key={`dot${i}`} className="meta-dot" aria-hidden="true">·</span>, item] : [item]))}
     </div>
   )
 }
@@ -269,7 +259,7 @@ const EXAMPLES: Company[] = [
   { cik: 726728, ticker: 'O', name: 'Realty Income' },
 ]
 
-function FrontPage({ onSelect }: { onSelect: (c: Company) => void }) {
+function FrontPage({ onSelect, searchRef }: { onSelect: (c: Company) => void; searchRef: React.Ref<HTMLInputElement> }) {
   const [count, setCount] = useState(0)
   const [latest, setLatest] = useState<{ company: Company; filingDate: string }[]>([])
   useEffect(() => {
@@ -285,7 +275,7 @@ function FrontPage({ onSelect }: { onSelect: (c: Company) => void }) {
         Every U.S. public company describes its business in Item 1 of its annual 10-K. Look one up and read it, with the
         jargon explained.
       </p>
-      <CompanySearch onSelect={onSelect} />
+      <CompanySearch onSelect={onSelect} inputRef={searchRef} />
 
       <div className="front-columns">
         <section aria-labelledby="try-one">

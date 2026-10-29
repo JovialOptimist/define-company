@@ -15,13 +15,18 @@
   --sans: 'Libre Franklin Variable', 'Libre Franklin', system-ui, 'Segoe UI', sans-serif;
 
   color-scheme: light dark;
+  /* Keep the scrollbar's space when the search dialog locks scrolling (on
+     this same element), so the page doesn't shift sideways. */
+  scrollbar-gutter: stable;
   font: 17px/1.6 var(--serif);
   color: var(--ink);
   background: var(--paper);
 }
 
+/* Dark follows the system unless the reader picked a theme (data-theme on
+   <html>, set by the masthead toggle and restored before first paint). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #141311;
     --surface: #1c1a17;
     --ink: #ede8de;
@@ -33,8 +38,24 @@
     --note-border: #d9b54f;
     --error-bg: #3b1c1a;
     --error-border: #f2948c;
+    color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --paper: #141311;
+  --surface: #1c1a17;
+  --ink: #ede8de;
+  --muted: #b3ac9f;
+  --rule: #4a463f;
+  --accent: #f08a7e;
+  --accent-soft: #3a2f27;
+  --note-bg: #2e2812;
+  --note-border: #d9b54f;
+  --error-bg: #3b1c1a;
+  --error-border: #f2948c;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--paper); }
