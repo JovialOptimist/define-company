@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { CompanySearch } from './components/CompanySearch'
 import { SectionView } from './components/SectionView'
-import { loadCompany } from './lib/data'
+import { datasetSize, latestFilings, loadCompany } from './lib/data'
 import { toFiling, type CompanyRecord } from './lib/dataset'
 import type { Company, Filing } from './lib/edgar'
 import { findItem1, type Section } from './lib/extract'
+import { displayName, formatDate, headlineName, pullQuote, readMinutes, standfirst } from './lib/presentation'
 import { edgar } from './lib/sec'
 
 type Load<T> =
@@ -16,6 +17,8 @@ type Load<T> =
 
 type FilingList = {
   name: string
+  tickers: string[]
+  industry?: string
   filings: Filing[]
   hasOlder: boolean
   /** False while only the dataset's latest 10-K is listed (EDGAR not asked yet). */
@@ -56,7 +59,8 @@ export default function App() {
       .then(async (rec): Promise<[FilingList, CompanyRecord | null]> => {
         if (rec) {
           const filings = [toFiling(rec.filing, '/sec-www')]
-          return [{ name: rec.name, filings, hasOlder: true, live: false }, rec]
+          const value = { name: rec.name, tickers: rec.tickers, industry: rec.industry, filings, hasOlder: true, live: false }
+          return [value, rec]
         }
         return [{ ...(await edgar.listTenKs(cik)), live: true }, null]
       })
@@ -101,9 +105,17 @@ export default function App() {
     }
   }, [filing, record])
 
-  function chooseCompany(company: Company) {
-    history.pushState(null, '', `?cik=${company.cik}`)
-    setCik(company.cik)
+  const shown = section.state === 'done' ? section.value : null
+  const headline = list.state === 'done' ? headlineName(list.value.name, shown) : null
+
+  useEffect(() => {
+    document.title = headline ? `${headline} · Define Company` : 'Define Company'
+  }, [headline])
+
+  function goTo(next: number | null) {
+    history.pushState(null, '', next === null ? './' : `?cik=${next}`)
+    setCik(next)
+    scrollTo(0, 0)
   }
 
   async function loadOlder() {
@@ -122,85 +134,189 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="masthead">
-        <h1>
-          <a href="./" onClick={(e) => { e.preventDefault(); history.pushState(null, '', './'); setCik(null) }}>
-            Define Company
-          </a>
-        </h1>
-        <p className="tagline">What a public company says it does, from Item 1 of its latest 10-K on SEC EDGAR.</p>
-        <CompanySearch onSelect={chooseCompany} />
-      </header>
+      <Masthead onHome={() => goTo(null)}>
+        {cik !== null && <CompanySearch compact onSelect={(c) => goTo(c.cik)} />}
+      </Masthead>
 
       <main>
+        {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} />}
+
         {list.state === 'loading' && <Status>{list.message}</Status>}
         {list.state === 'error' && <ErrorBox>{list.message}</ErrorBox>}
 
         {list.state === 'done' && filing && (
-          <FilingHeader
-            list={list.value}
-            filing={filing}
-            onChange={setFiling}
-            onLoadOlder={loadOlder}
-          />
+          <article className="story">
+            <header className="story-head">
+              <Kicker list={list.value} />
+              <h2 className="headline">{headline}</h2>
+              {shown && <Standfirst section={shown} name={list.value.name} />}
+              <FilingMeta
+                list={list.value}
+                filing={filing}
+                section={shown}
+                onChange={setFiling}
+                onLoadOlder={loadOlder}
+              />
+            </header>
+
+            {section.state === 'loading' && <Status>{section.message}</Status>}
+            {section.state === 'error' && <ErrorBox>{section.message}</ErrorBox>}
+            {section.state === 'done' &&
+              (shown ? (
+                <SectionView key={filing.accession} section={shown} quote={pullQuote(shown)} />
+              ) : (
+                <ErrorBox>
+                  Couldn't find the Item 1 (Business) section in this filing. Some 10-Ks use a
+                  magazine-style layout or put Item 1 in a separate exhibit.{' '}
+                  <a href={filing.publicUrl} target="_blank" rel="noreferrer">Open the 10-K on sec.gov</a>.
+                </ErrorBox>
+              ))}
+          </article>
         )}
-
-        {section.state === 'loading' && <Status>{section.message}</Status>}
-        {section.state === 'error' && <ErrorBox>{section.message}</ErrorBox>}
-        {section.state === 'done' && filing &&
-          (section.value ? (
-            <SectionView key={filing.accession} section={section.value} />
-          ) : (
-            <ErrorBox>
-              Couldn't find the Item 1 (Business) section in this filing. Some 10-Ks use a
-              magazine-style layout or put Item 1 in a separate exhibit.{' '}
-              <a href={filing.publicUrl} target="_blank" rel="noreferrer">Open the 10-K on sec.gov</a>.
-            </ErrorBox>
-          ))}
-
-        {cik === null && <Examples onSelect={chooseCompany} />}
       </main>
 
       <footer className="footer">
-        Data from <a href="https://www.sec.gov/edgar/search/">SEC EDGAR</a>. Text is extracted
-        automatically and may miss or include extra material; check the original filing for anything that matters.
+        <p>
+          Data from <a href="https://www.sec.gov/edgar/search/">SEC EDGAR</a>. Text is extracted automatically and may
+          miss or include extra material; check the original filing for anything that matters. Headlines, summaries
+          and pull quotes are picked from the filing's own words by a program, not an editor.
+        </p>
       </footer>
     </div>
   )
 }
 
-function FilingHeader(props: {
+const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+
+function Masthead({ onHome, children }: { onHome: () => void; children?: React.ReactNode }) {
+  return (
+    <header className="masthead">
+      <div className="masthead-bar">
+        <span className="masthead-side">Annual reports, explained</span>
+        <h1 className="wordmark">
+          <a href="./" onClick={(e) => { e.preventDefault(); onHome() }}>
+            Define Company
+          </a>
+        </h1>
+        <span className="masthead-side masthead-date">{TODAY}</span>
+      </div>
+      <div className="masthead-rule" aria-hidden="true" />
+      {children && <div className="masthead-search">{children}</div>}
+    </header>
+  )
+}
+
+function Kicker({ list }: { list: FilingList }) {
+  const parts = [list.industry, list.tickers.join(' · ')].filter(Boolean)
+  return parts.length ? <p className="kicker">{parts.join(' · ')}</p> : null
+}
+
+function Standfirst({ section, name }: { section: Section; name: string }) {
+  const text = standfirst(section, name)
+  return text ? <p className="standfirst">{text}</p> : null
+}
+
+function FilingMeta(props: {
   list: FilingList
   filing: Filing
+  section: Section | null
   onChange: (f: Filing) => void
   onLoadOlder: () => void
 }) {
-  const { list, filing } = props
+  const { list, filing, section } = props
   return (
-    <section className="filing" aria-label="Filing">
-      <h2 className="company-name">{list.name}</h2>
-      <div className="filing-meta">
+    <div className="filing-meta">
+      {section && <span>{section.heading}</span>}
+      <span>
+        From the {filing.form} filed {formatDate(filing.filingDate)}
+        {filing.reportDate && <>, for the fiscal year ended {formatDate(filing.reportDate)}</>}
+      </span>
+      {section && <span>{readMinutes(section)} min read</span>}
+      {list.filings.length > 1 && (
         <label>
-          <span className="meta-label">Filing</span>
+          <span className="visually-hidden">Filing</span>
           <select
             value={filing.accession}
             onChange={(e) => props.onChange(list.filings.find((f) => f.accession === e.target.value)!)}
           >
             {list.filings.map((f, i) => (
               <option key={f.accession} value={f.accession}>
-                {f.form} for period ending {f.reportDate || '?'} (filed {f.filingDate}){i === 0 ? ' · latest' : ''}
+                {f.form}, year ended {f.reportDate ? formatDate(f.reportDate) : '?'}
+                {i === 0 ? ' (latest)' : ''}
               </option>
             ))}
           </select>
         </label>
-        {list.hasOlder && (
-          <button type="button" className="link-button" onClick={props.onLoadOlder}>
-            {list.live ? 'Find older 10-Ks' : 'Other years'}
-          </button>
+      )}
+      {list.hasOlder && (
+        <button type="button" className="link-button" onClick={props.onLoadOlder}>
+          {list.live ? 'Find older 10-Ks' : 'Other years'}
+        </button>
+      )}
+      <a href={filing.publicUrl} target="_blank" rel="noreferrer">
+        Original on sec.gov ↗
+      </a>
+    </div>
+  )
+}
+
+const EXAMPLES: Company[] = [
+  { cik: 320193, ticker: 'AAPL', name: 'Apple Inc.' },
+  { cik: 1067983, ticker: 'BRK-B', name: 'Berkshire Hathaway' },
+  { cik: 21344, ticker: 'KO', name: 'Coca-Cola' },
+  { cik: 40545, ticker: 'GE', name: 'GE Aerospace' },
+  { cik: 1318605, ticker: 'TSLA', name: 'Tesla' },
+  { cik: 726728, ticker: 'O', name: 'Realty Income' },
+]
+
+function FrontPage({ onSelect }: { onSelect: (c: Company) => void }) {
+  const [count, setCount] = useState(0)
+  const [latest, setLatest] = useState<{ company: Company; filingDate: string }[]>([])
+  useEffect(() => {
+    datasetSize().then(setCount)
+    latestFilings(8).then(setLatest)
+  }, [])
+
+  return (
+    <section className="front" aria-labelledby="front-headline">
+      <p className="kicker">{count ? `${count.toLocaleString()} companies · ` : ''}Item 1 of the latest 10-K</p>
+      <h2 id="front-headline" className="headline front-headline">What does this company actually do?</h2>
+      <p className="standfirst">
+        Every U.S. public company describes its business in Item 1 of its annual 10-K. Look one up and read it, with the
+        jargon explained.
+      </p>
+      <CompanySearch onSelect={onSelect} />
+
+      <div className="front-columns">
+        <section aria-labelledby="try-one">
+          <h3 id="try-one" className="rubric">Try one</h3>
+          <ol className="front-list">
+            {EXAMPLES.map((c) => (
+              <li key={c.cik}>
+                <button type="button" onClick={() => onSelect(c)}>
+                  <span className="ticker">{c.ticker}</span>
+                  <span className="front-name">{c.name}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+        {latest.length > 0 && (
+          <section aria-labelledby="just-filed">
+            <h3 id="just-filed" className="rubric">Just filed</h3>
+            <ol className="front-list">
+              {latest.map(({ company, filingDate }) => (
+                <li key={company.cik}>
+                  <button type="button" onClick={() => onSelect(company)}>
+                    <span className="ticker">{company.ticker || '—'}</span>
+                    <span className="front-name">{displayName(company.name)}</span>
+                    <span className="front-date">{formatDate(filingDate).replace(/, \d{4}$/, '')}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
         )}
-        <a href={filing.publicUrl} target="_blank" rel="noreferrer">
-          Open on sec.gov ↗
-        </a>
       </div>
     </section>
   )
@@ -221,32 +337,6 @@ function ErrorBox({ children }: { children: React.ReactNode }) {
         <span aria-hidden="true">✕ </span>Problem:
       </strong>{' '}
       {children}
-    </div>
-  )
-}
-
-const EXAMPLES: Company[] = [
-  { cik: 320193, ticker: 'AAPL', name: 'Apple Inc.' },
-  { cik: 1067983, ticker: 'BRK-B', name: 'Berkshire Hathaway' },
-  { cik: 21344, ticker: 'KO', name: 'Coca-Cola' },
-  { cik: 40545, ticker: 'GE', name: 'GE Aerospace' },
-  { cik: 1318605, ticker: 'TSLA', name: 'Tesla' },
-  { cik: 726728, ticker: 'O', name: 'Realty Income' },
-]
-
-function Examples({ onSelect }: { onSelect: (c: Company) => void }) {
-  return (
-    <div className="examples">
-      <p>Try one:</p>
-      <ul>
-        {EXAMPLES.map((c) => (
-          <li key={c.cik}>
-            <button type="button" onClick={() => onSelect(c)}>
-              <span className="ticker">{c.ticker}</span> {c.name}
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
