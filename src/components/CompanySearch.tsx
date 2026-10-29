@@ -25,8 +25,9 @@ export function CompanySearch(props: {
    * always visible, instead of in a drop-down. The dialog handles Escape.
    */
   inDialog?: boolean
+  inputRef?: React.Ref<HTMLInputElement>
 }) {
-  const { onSelect, inDialog } = props
+  const { onSelect, inDialog, inputRef } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Company[]>([])
   const [active, setActive] = useState(0)
@@ -100,6 +101,7 @@ export function CompanySearch(props: {
         Company ticker, name or CIK
       </label>
       <input
+        ref={inputRef}
         id={`${listId}-input`}
         type="search"
         placeholder="Ticker, company name or CIK, e.g. AAPL"

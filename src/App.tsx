@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { CompanySearch } from './components/CompanySearch'
 import { Masthead } from './components/Masthead'
@@ -37,6 +37,7 @@ export default function App() {
   const [filing, setFiling] = useState<Filing | null>(null)
   const [record, setRecord] = useState<CompanyRecord | null>(null)
   const [section, setSection] = useState<Load<Section | null>>({ state: 'idle' })
+  const homeSearch = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const onPop = () => setCik(readCikFromUrl())
@@ -135,10 +136,16 @@ export default function App() {
 
   return (
     <div className="app">
-      <Masthead onHome={() => goTo(null)} onSelect={(c) => goTo(c.cik)} />
+      <Masthead
+        onHome={() => goTo(null)}
+        onSelect={(c) => goTo(c.cik)}
+        // The front page has its own big search box: point the header's
+        // Search button at it rather than opening a second search.
+        pageSearch={cik === null ? homeSearch : undefined}
+      />
 
       <main>
-        {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} />}
+        {cik === null && <FrontPage onSelect={(c) => goTo(c.cik)} searchRef={homeSearch} />}
 
         {list.state === 'loading' && <Status>{list.message}</Status>}
         {list.state === 'error' && <ErrorBox>{list.message}</ErrorBox>}
@@ -248,7 +255,7 @@ const EXAMPLES: Company[] = [
   { cik: 726728, ticker: 'O', name: 'Realty Income' },
 ]
 
-function FrontPage({ onSelect }: { onSelect: (c: Company) => void }) {
+function FrontPage({ onSelect, searchRef }: { onSelect: (c: Company) => void; searchRef: React.Ref<HTMLInputElement> }) {
   const [count, setCount] = useState(0)
   const [latest, setLatest] = useState<{ company: Company; filingDate: string }[]>([])
   useEffect(() => {
@@ -264,7 +271,7 @@ function FrontPage({ onSelect }: { onSelect: (c: Company) => void }) {
         Every U.S. public company describes its business in Item 1 of its annual 10-K. Look one up and read it, with the
         jargon explained.
       </p>
-      <CompanySearch onSelect={onSelect} />
+      <CompanySearch onSelect={onSelect} inputRef={searchRef} />
 
       <div className="front-columns">
         <section aria-labelledby="try-one">

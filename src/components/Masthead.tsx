@@ -31,9 +31,24 @@ function ThemeToggle() {
   )
 }
 
-export function Masthead({ onHome, onSelect }: { onHome: () => void; onSelect: (c: Company) => void }) {
+export function Masthead(props: {
+  onHome: () => void
+  onSelect: (c: Company) => void
+  /** A search field already on the page: the Search button goes to it instead of opening the dialog. */
+  pageSearch?: React.RefObject<HTMLInputElement | null>
+}) {
+  const { onHome, onSelect, pageSearch } = props
   const [searching, setSearching] = useState(false)
   const searchButton = useRef<HTMLButtonElement>(null)
+
+  function search() {
+    const field = pageSearch?.current
+    if (!field) return setSearching(true)
+    // Focus during the click, so phones open the keyboard, then jump the field
+    // to mid-screen. No smooth scroll: Chrome drops it when focus moves.
+    field.focus({ preventScroll: true })
+    field.scrollIntoView({ block: 'center' })
+  }
   return (
     <header className="masthead">
       <div className="masthead-bar">
@@ -48,9 +63,9 @@ export function Masthead({ onHome, onSelect }: { onHome: () => void; onSelect: (
             ref={searchButton}
             type="button"
             className="masthead-button"
-            onClick={() => setSearching(true)}
+            onClick={search}
             aria-label="Search companies"
-            aria-haspopup="dialog"
+            aria-haspopup={pageSearch ? undefined : 'dialog'}
           >
             <SearchIcon />
             <span className="masthead-button-label">Search</span>
