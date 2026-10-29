@@ -210,38 +210,42 @@ function FilingMeta(props: {
   onLoadOlder: () => void
 }) {
   const { list, filing, section } = props
+  const items = [
+    section && <span key="heading">{section.heading}</span>,
+    <span key="filed">
+      From the {filing.form} filed {formatDate(filing.filingDate)}
+      {filing.reportDate && <>, for the fiscal year ended {formatDate(filing.reportDate)}</>}
+    </span>,
+    section && <span key="read">{readMinutes(section)} min read</span>,
+    list.filings.length > 1 && (
+      <label key="filing">
+        <span className="visually-hidden">Filing</span>
+        <select
+          value={filing.accession}
+          onChange={(e) => props.onChange(list.filings.find((f) => f.accession === e.target.value)!)}
+        >
+          {list.filings.map((f, i) => (
+            <option key={f.accession} value={f.accession}>
+              {f.form}, year ended {f.reportDate ? formatDate(f.reportDate) : '?'}
+              {i === 0 ? ' (latest)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+    ),
+    list.hasOlder && (
+      <button key="older" type="button" className="link-button" onClick={props.onLoadOlder}>
+        {list.live ? 'Find older 10-Ks' : 'Other years'}
+      </button>
+    ),
+    <a key="sec" href={filing.publicUrl} target="_blank" rel="noreferrer">
+      Original on sec.gov ↗
+    </a>,
+  ].filter(Boolean)
   return (
     <div className="filing-meta">
-      {section && <span>{section.heading}</span>}
-      <span>
-        From the {filing.form} filed {formatDate(filing.filingDate)}
-        {filing.reportDate && <>, for the fiscal year ended {formatDate(filing.reportDate)}</>}
-      </span>
-      {section && <span>{readMinutes(section)} min read</span>}
-      {list.filings.length > 1 && (
-        <label>
-          <span className="visually-hidden">Filing</span>
-          <select
-            value={filing.accession}
-            onChange={(e) => props.onChange(list.filings.find((f) => f.accession === e.target.value)!)}
-          >
-            {list.filings.map((f, i) => (
-              <option key={f.accession} value={f.accession}>
-                {f.form}, year ended {f.reportDate ? formatDate(f.reportDate) : '?'}
-                {i === 0 ? ' (latest)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {list.hasOlder && (
-        <button type="button" className="link-button" onClick={props.onLoadOlder}>
-          {list.live ? 'Find older 10-Ks' : 'Other years'}
-        </button>
-      )}
-      <a href={filing.publicUrl} target="_blank" rel="noreferrer">
-        Original on sec.gov ↗
-      </a>
+      {/* Dots go between the items, not inside them, so links don't underline them. */}
+      {items.flatMap((item, i) => (i ? [<span key={`dot${i}`} className="meta-dot" aria-hidden="true">·</span>, item] : [item]))}
     </div>
   )
 }

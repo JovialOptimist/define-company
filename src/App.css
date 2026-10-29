@@ -217,7 +217,7 @@ main { margin-top: 2.25rem; }
   color: var(--muted);
 }
 /* Middle dots between the pieces, so each reads as its own item. */
-.filing-meta > * + *::before { content: '·'; margin: 0 0.55rem; color: var(--muted); }
+.meta-dot { margin: 0 0.55rem; }
 .filing-meta label { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
 .filing-meta select {
   min-width: 0;
@@ -411,7 +411,7 @@ main { margin-top: 2.25rem; }
   .app { padding: 1rem 1rem 2.5rem; }
   /* Stacked meta lines: no leading separators where a row wraps. */
   .filing-meta { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
-  .filing-meta > * + *::before { content: none; }
+  .meta-dot { display: none; }
   .pull-quote { float: none; width: auto; margin: 1.25rem 0; }
   .section-body { font-size: 1.05rem; }
 }
