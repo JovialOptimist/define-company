@@ -43,9 +43,6 @@
 }
 .masthead-button:hover { border-color: var(--ink); }
 .masthead-close { font-size: 1.4rem; font-weight: 400; letter-spacing: 0; }
-.masthead-search { display: flex; flex: 1; align-items: center; gap: 0.15rem; min-width: 0; max-width: 24rem; }
-.masthead-search .search { flex: 1; min-width: 0; }
-.masthead-search .suggestions { left: auto; width: min(28rem, calc(100vw - 2rem)); }
 .wordmark { margin: 0; font-family: var(--display); font-size: 2.1rem; font-weight: 900; line-height: 1.1; }
 .wordmark a { color: inherit; text-decoration: none; }
 /* The double rule under a newspaper's nameplate. */
@@ -113,8 +110,6 @@
   cursor: pointer;
 }
 .search button:disabled { opacity: 0.55; cursor: default; }
-.search-compact input { min-height: 2.4rem; font-size: 0.9rem; }
-.search-compact button[type='submit'] { padding: 0 0.8rem; font-size: 0.72rem; }
 
 .suggestions {
   position: absolute;
@@ -395,11 +390,6 @@ main { margin-top: 2.25rem; }
   .masthead-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.5rem; }
   .masthead-side, .masthead-button-label { display: none; }
   .wordmark { font-size: 1.6rem; }
-  /* An open search takes its own full-width row under the wordmark. */
-  .masthead-searching .masthead-actions { flex-basis: 100%; }
-  .masthead-search { max-width: none; }
-  /* The field starts at the gutter: open the list rightwards, across the page. */
-  .masthead-search .suggestions { left: 0; right: auto; width: calc(100vw - 2rem); }
   /* Stacked meta lines: no leading separators where a row wraps. */
   .filing-meta { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
   .filing-meta > * + *::before { content: none; }
@@ -407,7 +397,63 @@ main { margin-top: 2.25rem; }
   .section-body { font-size: 1.05rem; }
 }
 
-/* In the masthead, Enter or a suggestion submits; the button and the
-   browser's own clear "×" would only crowd the field next to our close. */
-.search-compact button[type='submit'] { display: none; }
-.search-compact input::-webkit-search-cancel-button { display: none; }
+/* ---- search dialog ---- */
+/* A centred panel on wide screens; a full-screen sheet on phones (below). */
+.search-dialog {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: min(36rem, calc(100dvh - 6rem));
+  margin: 4.5rem auto auto;
+  padding: 0;
+  border: 1px solid var(--ink);
+  border-top-width: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.3);
+}
+.search-dialog::backdrop { background: rgb(17 17 17 / 0.45); }
+/* The page behind shouldn't scroll while searching. */
+html:has(.search-dialog[open]) { overflow: hidden; }
+.search-dialog-body { display: flex; flex-direction: column; max-height: inherit; padding: 0.9rem 1.1rem 0.75rem; }
+.search-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+.search-dialog-head .rubric { margin: 0; }
+.search-dialog-head .masthead-close { margin-right: -0.6rem; }
+.search-in-dialog { flex: 1; flex-direction: column; min-height: 0; }
+/* At least 16px text, so phone browsers don't zoom in on focus. */
+.search-in-dialog input { flex: none; min-height: 3rem; font-size: 1.05rem; border-width: 2px; }
+.search-in-dialog input::-webkit-search-cancel-button { display: none; }
+.search-in-dialog .suggestions {
+  position: static;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--ink);
+  box-shadow: none;
+  font-size: 0.95rem;
+}
+.search-in-dialog .suggestions li { padding: 0.7rem 0.6rem; border-bottom: 1px solid var(--rule); }
+.search-in-dialog .suggestions li:last-child { border-bottom: 0; }
+.search-in-dialog .search-error { position: static; }
+.search-status { margin: 0.9rem 0 0.4rem; color: var(--muted); font-family: var(--sans); font-size: 0.9rem; }
+.search-dialog-keys { margin: 0.6rem 0 0; color: var(--muted); font-family: var(--sans); font-size: 0.75rem; }
+
+@media (max-width: 48rem) {
+  /* Full-screen sheet, as DocSearch and Material for MkDocs do on phones. */
+  .search-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .search-dialog-body { height: 100%; padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0; }
+  /* Names wrap under the ticker instead of squeezing beside the CIK. */
+  .search-in-dialog .suggestions li { grid-template-columns: 4.5rem 1fr; min-height: 3rem; }
+  .search-in-dialog .suggestions .cik { grid-column: 2; }
+  /* Touch keyboards have no arrow keys. */
+  .search-dialog-keys { display: none; }
+}

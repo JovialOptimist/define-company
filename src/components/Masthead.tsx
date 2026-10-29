@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Company } from '../lib/edgar'
 import { CompanySearch } from './CompanySearch'
 
@@ -33,8 +33,9 @@ function ThemeToggle() {
 
 export function Masthead({ onHome, onSelect }: { onHome: () => void; onSelect: (c: Company) => void }) {
   const [searching, setSearching] = useState(false)
+  const searchButton = useRef<HTMLButtonElement>(null)
   return (
-    <header className={searching ? 'masthead masthead-searching' : 'masthead'}>
+    <header className="masthead">
       <div className="masthead-bar">
         <span className="masthead-side masthead-tag">Annual reports, explained</span>
         <h1 className="wordmark">
@@ -43,36 +44,87 @@ export function Masthead({ onHome, onSelect }: { onHome: () => void; onSelect: (
           </a>
         </h1>
         <div className="masthead-actions">
-          {searching ? (
-            <div className="masthead-search">
-              <CompanySearch
-                compact
-                onSelect={(c) => {
-                  setSearching(false)
-                  onSelect(c)
-                }}
-                onCancel={() => setSearching(false)}
-              />
-              <button
-                type="button"
-                className="masthead-button masthead-close"
-                aria-label="Close search"
-                onClick={() => setSearching(false)}
-              >
-                ×
-              </button>
-            </div>
-          ) : (
-            <button type="button" className="masthead-button" onClick={() => setSearching(true)} aria-label="Search companies">
-              <SearchIcon />
-              <span className="masthead-button-label">Search</span>
-            </button>
-          )}
+          <button
+            ref={searchButton}
+            type="button"
+            className="masthead-button"
+            onClick={() => setSearching(true)}
+            aria-label="Search companies"
+            aria-haspopup="dialog"
+          >
+            <SearchIcon />
+            <span className="masthead-button-label">Search</span>
+          </button>
           <ThemeToggle />
         </div>
       </div>
       <div className="masthead-rule" aria-hidden="true" />
+      <SearchDialog
+        open={searching}
+        onClose={() => {
+          setSearching(false)
+          searchButton.current?.focus()
+        }}
+        onSelect={(c) => {
+          setSearching(false)
+          onSelect(c)
+        }}
+      />
     </header>
+  )
+}
+
+/**
+ * Company search in a modal <dialog>: a centred panel on wide screens and a
+ * full-screen sheet on phones (as DocSearch and Material for MkDocs do). The
+ * browser makes the page behind inert and closes it on Escape; clicking the
+ * backdrop closes it too.
+ */
+function SearchDialog(props: { open: boolean; onClose: () => void; onSelect: (c: Company) => void }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const { open, onClose } = props
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    if (open && !dialog.open) {
+      dialog.showModal()
+      // showModal() focuses the first control (the close button); start in the field.
+      dialog.querySelector('input')?.focus()
+    } else if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  return (
+    <dialog
+      ref={ref}
+      className="search-dialog"
+      aria-label="Search companies"
+      onClose={onClose}
+      // A search field spends Escape on clearing itself; close on the first press.
+      onKeyDownCapture={(e) => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        onClose()
+      }}
+      // The dialog itself has no padding, so a click that lands on it (not
+      // its contents) is a click on the backdrop.
+      onClick={(e) => e.target === ref.current && onClose()}
+    >
+      {open && (
+        <div className="search-dialog-body">
+          <div className="search-dialog-head">
+            <h2 className="rubric">Look up a company</h2>
+            <button type="button" className="masthead-button masthead-close" aria-label="Close search" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <CompanySearch inDialog onSelect={props.onSelect} />
+          <p className="search-dialog-keys" aria-hidden="true">
+            ↑ ↓ to choose · Enter to open · Esc to close
+          </p>
+        </div>
+      )}
+    </dialog>
   )
 }
 

@@ -20,16 +20,19 @@ async function search(query: string): Promise<Company[]> {
 /** Ticker / name / CIK search box with a keyboard-navigable suggestion list. */
 export function CompanySearch(props: {
   onSelect: (c: Company) => void
-  /** The masthead's small version, which opens focused and can be dismissed. */
-  compact?: boolean
-  onCancel?: () => void
+  /**
+   * Inside the search dialog: opens focused and lists results in place,
+   * always visible, instead of in a drop-down. The dialog handles Escape.
+   */
+  inDialog?: boolean
 }) {
-  const { onSelect, compact, onCancel } = props
+  const { onSelect, inDialog } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Company[]>([])
   const [active, setActive] = useState(0)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const listId = useId()
   const latest = useRef(0)
 
@@ -37,9 +40,11 @@ export function CompanySearch(props: {
     const q = query.trim()
     if (!q) {
       setResults([])
+      setPending(false)
       return
     }
     const id = ++latest.current
+    setPending(true)
     const timer = setTimeout(() => {
       search(q).then(
         (r) => {
@@ -47,8 +52,13 @@ export function CompanySearch(props: {
           setResults(r)
           setActive(0)
           setError(null)
+          setPending(false)
         },
-        (e: Error) => id === latest.current && setError(e.message),
+        (e: Error) => {
+          if (id !== latest.current) return
+          setError(e.message)
+          setPending(false)
+        },
       )
     }, 150)
     return () => clearTimeout(timer)
@@ -69,18 +79,17 @@ export function CompanySearch(props: {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActive((a) => Math.max(a - 1, 0))
-    } else if (e.key === 'Escape') {
-      // First Escape closes the suggestions, the next one the search itself.
-      if (open && results.length) setOpen(false)
-      else onCancel?.()
+    } else if (e.key === 'Escape' && !inDialog) {
+      setOpen(false)
     }
   }
 
-  const showList = open && results.length > 0
+  const showList = (inDialog || open) && results.length > 0
+  const q = query.trim()
 
   return (
     <form
-      className={compact ? 'search search-compact' : 'search'}
+      className={inDialog ? 'search search-in-dialog' : 'search'}
       role="search"
       onSubmit={(e) => {
         e.preventDefault()
@@ -93,7 +102,7 @@ export function CompanySearch(props: {
       <input
         id={`${listId}-input`}
         type="search"
-        placeholder={compact ? 'Look up another company' : 'Ticker, company name or CIK, e.g. AAPL'}
+        placeholder="Ticker, company name or CIK, e.g. AAPL"
         autoComplete="off"
         spellCheck={false}
         role="combobox"
@@ -108,11 +117,14 @@ export function CompanySearch(props: {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={onKeyDown}
-        autoFocus={compact}
+        autoFocus={inDialog}
+        enterKeyHint="search"
       />
-      <button type="submit" disabled={!results.length}>
-        Look up
-      </button>
+      {!inDialog && (
+        <button type="submit" disabled={!results.length}>
+          Look up
+        </button>
+      )}
       {showList && (
         <ul className="suggestions" id={listId} role="listbox">
           {results.map((c, i) => (
@@ -134,6 +146,11 @@ export function CompanySearch(props: {
             </li>
           ))}
         </ul>
+      )}
+      {inDialog && !showList && !error && (
+        <p className="search-status" role="status">
+          {!q ? 'Type a ticker, company name or CIK.' : pending ? 'Searching…' : `No companies with a 10-K match “${q}”.`}
+        </p>
       )}
       {error && (
         <p className="search-error" role="alert">
