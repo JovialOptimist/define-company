@@ -15,6 +15,9 @@
   --sans: 'Libre Franklin Variable', 'Libre Franklin', system-ui, 'Segoe UI', sans-serif;
 
   color-scheme: light dark;
+  /* Keep the scrollbar's space when the search dialog locks scrolling (on
+     this same element), so the page doesn't shift sideways. */
+  scrollbar-gutter: stable;
   font: 17px/1.6 var(--serif);
   color: var(--ink);
   background: var(--paper);
