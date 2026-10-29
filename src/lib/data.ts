@@ -56,3 +56,15 @@ export async function searchDataset(query: string, limit: number): Promise<Compa
 function toCompany([cik, name, tickers]: IndexRow): Company {
   return { cik, name, ticker: tickers.split(',')[0] ?? '' }
 }
+
+/** How many companies the dataset has (0 when it isn't deployed). */
+export async function datasetSize(): Promise<number> {
+  return (await loadIndex()).length
+}
+
+/** The companies whose latest 10-K was filed most recently. */
+export async function latestFilings(limit: number): Promise<{ company: Company; filingDate: string }[]> {
+  const rows = [...(await loadIndex())]
+  rows.sort((a, b) => b[3].localeCompare(a[3]) || a[1].localeCompare(b[1]))
+  return rows.slice(0, limit).map((row) => ({ company: toCompany(row), filingDate: row[3] }))
+}

@@ -1,6 +1,7 @@
 import { useCallback, useId, useMemo, useState } from 'react'
 import type { Run, Section, SectionBlock } from '../lib/extract'
 import { findTerms, type GlossaryEntry } from '../lib/glossary'
+import type { PullQuote } from '../lib/presentation'
 import { Term, TermPopover, type OpenTerm } from './Glossary'
 
 /** A run split further into plain text and glossary terms. */
@@ -38,7 +39,7 @@ function withTerms(blocks: SectionBlock[]): ShownBlock[] {
 
 const slug = (i: number) => `part-${i}`
 
-export function SectionView({ section }: { section: Section }) {
+export function SectionView({ section, quote }: { section: Section; quote: PullQuote | null }) {
   const blocks = useMemo(() => withTerms(section.blocks), [section])
   const [open, setOpen] = useState<OpenTerm | null>(null)
   const close = useCallback(() => setOpen(null), [])
@@ -47,7 +48,6 @@ export function SectionView({ section }: { section: Section }) {
   const headings = blocks
     .map((b, i) => (b.type === 'heading' ? { text: b.text, id: slug(i) } : null))
     .filter((h): h is { text: string; id: string } => !!h)
-  const words = Math.round(section.length / 6)
 
   const renderPieces = (pieces: Piece[]) =>
     pieces.map((p, i) => {
@@ -68,9 +68,11 @@ export function SectionView({ section }: { section: Section }) {
       return <span key={i}>{node}</span>
     })
 
-  // Consecutive bullets render as one list.
+  // Consecutive bullets render as one list. The pull quote goes in after the
+  // third paragraph, ahead of the subsection it comes from.
   const rendered: React.ReactNode[] = []
   let bullets: React.ReactNode[] = []
+  let paragraphs = 0
   const flush = (key: number) => {
     if (bullets.length) rendered.push(<ul key={`ul-${key}`}>{bullets}</ul>)
     bullets = []
@@ -82,8 +84,19 @@ export function SectionView({ section }: { section: Section }) {
     }
     flush(i)
     if (b.type === 'heading') rendered.push(<h3 key={i} id={slug(i)}>{b.text}</h3>)
-    else if (b.type === 'paragraph') rendered.push(<p key={i}>{renderPieces(b.pieces)}</p>)
-    else
+    else if (b.type === 'paragraph') {
+      rendered.push(<p key={i}>{renderPieces(b.pieces)}</p>)
+      if (++paragraphs === 3 && quote && quote.headingIndex > i) {
+        rendered.push(
+          <figure key="quote" className="pull-quote">
+            <blockquote>{quote.text}</blockquote>
+            <figcaption>
+              <a href={`#${slug(quote.headingIndex)}`}>{quote.heading}</a>
+            </figcaption>
+          </figure>,
+        )
+      }
+    } else
       rendered.push(
         <div key={i} className="table-wrap">
           <table>
@@ -103,27 +116,23 @@ export function SectionView({ section }: { section: Section }) {
   flush(blocks.length)
 
   return (
-    <article className="section">
-      <header className="section-head">
-        <h2>{section.heading}</h2>
-        <p className="section-size">About {words.toLocaleString()} words · {Math.max(1, Math.round(words / 230))} min read</p>
-        <p className="term-hint">
-          <span className="term-sample">Dashed underlines</span> mark business jargon. Click one for a plain-English definition.
-        </p>
-      </header>
+    <div className={headings.length >= 2 ? 'story-body' : 'story-body story-body-single'}>
+      <div className="section-body">
+        {section.note && (
+          <div className="callout callout-note" role="note">
+            <strong>
+              <span aria-hidden="true">ⓘ </span>Note:
+            </strong>{' '}
+            {section.note}
+          </div>
+        )}
+        {headings.length < 2 && <TermHint />}
+        {rendered}
+      </div>
 
-      {section.note && (
-        <div className="callout callout-note" role="note">
-          <strong>
-            <span aria-hidden="true">ⓘ </span>Note:
-          </strong>{' '}
-          {section.note}
-        </div>
-      )}
-
-      {headings.length >= 4 && (
-        <details className="contents">
-          <summary>Contents ({headings.length} topics)</summary>
+      {headings.length >= 2 && (
+        <nav className="filing-index" aria-labelledby={`${popoverId}-index`}>
+          <h3 id={`${popoverId}-index`} className="rubric">In this filing</h3>
           <ol>
             {headings.map((h) => (
               <li key={h.id}>
@@ -131,11 +140,19 @@ export function SectionView({ section }: { section: Section }) {
               </li>
             ))}
           </ol>
-        </details>
+          <TermHint />
+        </nav>
       )}
-
-      <div className="section-body">{rendered}</div>
       {open && <TermPopover key={open.termId} open={open} onClose={close} id={popoverId} />}
-    </article>
+    </div>
+  )
+}
+
+function TermHint() {
+  return (
+    <p className="term-hint">
+      <span className="term-sample">Dashed underlines</span> mark business jargon. Click one for a plain-English
+      definition.
+    </p>
   )
 }

@@ -18,7 +18,7 @@ async function search(query: string): Promise<Company[]> {
 }
 
 /** Ticker / name / CIK search box with a keyboard-navigable suggestion list. */
-export function CompanySearch({ onSelect }: { onSelect: (c: Company) => void }) {
+export function CompanySearch({ onSelect, compact }: { onSelect: (c: Company) => void; compact?: boolean }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Company[]>([])
   const [active, setActive] = useState(0)
@@ -72,7 +72,7 @@ export function CompanySearch({ onSelect }: { onSelect: (c: Company) => void }) 
 
   return (
     <form
-      className="search"
+      className={compact ? 'search search-compact' : 'search'}
       role="search"
       onSubmit={(e) => {
         e.preventDefault()
@@ -85,7 +85,7 @@ export function CompanySearch({ onSelect }: { onSelect: (c: Company) => void }) 
       <input
         id={`${listId}-input`}
         type="search"
-        placeholder="Ticker, company name or CIK, e.g. AAPL"
+        placeholder={compact ? 'Look up another company' : 'Ticker, company name or CIK, e.g. AAPL'}
         autoComplete="off"
         spellCheck={false}
         role="combobox"
